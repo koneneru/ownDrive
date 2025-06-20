@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Vanara.InteropServices;
 using Vanara.PInvoke;
 using static Vanara.PInvoke.CldApi;
 
@@ -27,6 +28,11 @@ namespace ownDrive.Domain
 				new() {
 					Callback=new CF_CALLBACK(OnFetchData),
 					Type = CF_CALLBACK_TYPE.CF_CALLBACK_TYPE_FETCH_DATA
+				},
+				new()
+				{
+					Callback = new CF_CALLBACK(OnFetchPlaceholders),
+					Type = CF_CALLBACK_TYPE.CF_CALLBACK_TYPE_FETCH_PLACEHOLDERS
 				},
 				CF_CALLBACK_REGISTRATION.CF_CALLBACK_REGISTRATION_END
 			};
@@ -92,6 +98,25 @@ namespace ownDrive.Domain
 			}/*Put cancellation token here*/);
 		}
 
+		private void OnFetchPlaceholders(in CF_CALLBACK_INFO cbInfo, in CF_CALLBACK_PARAMETERS cbParams)
+		{
+			var opInfo = CreateOperationInfo(cbInfo, CF_OPERATION_TYPE.CF_OPERATION_TYPE_TRANSFER_PLACEHOLDERS);
+			if (!_placeholderRepository.Connected)
+			{
+				var e = Array.Empty<CF_PLACEHOLDER_CREATE_INFO>();
+				TransferPlaceholders(opInfo, in e, 0, new NTStatus((uint)NtStatus.STATUS_CLOUD_FILE_NETWORK_UNAVAILABLE));
+
+				return;
+            }
+
+            // ADD CANCELATION TOKEN USAGE
+
+            Task.Run(() =>
+			{
+				throw new NotImplementedException();
+            }/*Put cancellation token here*/);
+		}
+
 		private static CF_OPERATION_INFO CreateOperationInfo(CF_CALLBACK_INFO cbInfo, CF_OPERATION_TYPE opType)
 		{
 			CF_OPERATION_INFO opInfo = new()
@@ -128,6 +153,21 @@ namespace ownDrive.Domain
 			{
 				handle.Free();
 			}
+		}
+
+		private static void TransferPlaceholders(CF_OPERATION_INFO opInfo, in CF_PLACEHOLDER_CREATE_INFO[] pcInfo, uint count, NTStatus completionStatus)
+		{
+			var cInfo = new SafeNativeArray<CF_PLACEHOLDER_CREATE_INFO>(pcInfo);
+			CF_OPERATION_PARAMETERS.TRANSFERPLACEHOLDERS tpParams = new()
+			{
+				PlaceholderArray = cInfo,
+				PlaceholderCount = count,
+				PlaceholderTotalCount = count,
+				Flags = CF_OPERATION_TRANSFER_PLACEHOLDERS_FLAGS.CF_OPERATION_TRANSFER_PLACEHOLDERS_FLAG_NONE,
+				CompletionStatus = completionStatus,
+			};
+			var opParams = CF_OPERATION_PARAMETERS.Create(tpParams);
+			CfExecute(opInfo, ref opParams);
 		}
 	}
 }
