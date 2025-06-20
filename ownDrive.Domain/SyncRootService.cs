@@ -24,9 +24,9 @@ namespace ownDrive.Domain
 
 		public void ConnectSyncRootTransferCallbacks()
 		{
-			CF_CALLBACK_REGISTRATION[] callbackTable = {
+            CF_CALLBACK_REGISTRATION[] callbackTable = [
 				new() {
-					Callback=new CF_CALLBACK(OnFetchData),
+					Callback = new CF_CALLBACK(OnFetchData),
 					Type = CF_CALLBACK_TYPE.CF_CALLBACK_TYPE_FETCH_DATA
 				},
 				new()
@@ -35,7 +35,7 @@ namespace ownDrive.Domain
 					Type = CF_CALLBACK_TYPE.CF_CALLBACK_TYPE_FETCH_PLACEHOLDERS
 				},
 				CF_CALLBACK_REGISTRATION.CF_CALLBACK_REGISTRATION_END
-			};
+			];
 
 			_syncroot.Connect(callbackTable);
 		}
