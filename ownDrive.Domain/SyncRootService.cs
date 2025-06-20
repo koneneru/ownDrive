@@ -47,8 +47,8 @@ namespace ownDrive.Domain
 			var opInfo = CreateOperationInfo(cbInfo, CF_OPERATION_TYPE.CF_OPERATION_TYPE_TRANSFER_DATA);
 			if (!_placeholderRepository.Connected)
 			{
-				var b = Array.Empty<byte>();
-				TransferData(opInfo, in b, cbParams.FetchData.RequiredFileOffset, cbParams.FetchData.RequiredLength, new NTStatus((uint)NtStatus.STATUS_CLOUD_FILE_NETWORK_UNAVAILABLE));
+				var e = Array.Empty<byte>();
+				TransferData(opInfo, in e, cbParams.FetchData.RequiredFileOffset, cbParams.FetchData.RequiredLength, new NTStatus((uint)NtStatus.STATUS_CLOUD_FILE_NETWORK_UNAVAILABLE));
 
 				return;
 			}
