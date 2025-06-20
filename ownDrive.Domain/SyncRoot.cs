@@ -66,6 +66,12 @@ namespace ownDrive.Domain
 			return true;
 		}
 
+		public string GetRelativaPath(string fullPath)
+		{
+			var rp = System.IO.Path.GetRelativePath(Path, fullPath);
+			return rp == "." ? string.Empty : rp;
+		}
+
 		private static Dictionary<string, Placeholder> BuildPlaceholdersDictionary(IEnumerable<Placeholder> files)
 		{
 			Dictionary<string, Placeholder> d = [];
