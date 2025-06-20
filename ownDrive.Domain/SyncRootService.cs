@@ -134,25 +134,17 @@ namespace ownDrive.Domain
 
 		private static void TransferData(CF_OPERATION_INFO opInfo, in byte[] buffer, long offset, long length, NTStatus completionStatus)
 		{
-			var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-			var ptr = (IntPtr)handle;
-			try
+			var buf = new SafeNativeArray<byte>(buffer);
+			CF_OPERATION_PARAMETERS.TRANSFERDATA tdParams = new()
 			{
-				CF_OPERATION_PARAMETERS.TRANSFERDATA tdParams = new()
-				{
-					Buffer = ptr,
-					Offset = offset,
-					Length = length,
-					Flags = CF_OPERATION_TRANSFER_DATA_FLAGS.CF_OPERATION_TRANSFER_DATA_FLAG_NONE, //Required?
-					CompletionStatus = completionStatus
-				};
-				var opParams = CF_OPERATION_PARAMETERS.Create(tdParams);
-				CfExecute(opInfo, ref opParams);
-			}
-			finally
-			{
-				handle.Free();
-			}
+				Buffer = buf,
+				Offset = offset,
+				Length = length,
+				Flags = CF_OPERATION_TRANSFER_DATA_FLAGS.CF_OPERATION_TRANSFER_DATA_FLAG_NONE, //Required?
+				CompletionStatus = completionStatus
+			};
+			var opParams = CF_OPERATION_PARAMETERS.Create(tdParams);
+			CfExecute(opInfo, ref opParams);
 		}
 
 		private static void TransferPlaceholders(CF_OPERATION_INFO opInfo, in CF_PLACEHOLDER_CREATE_INFO[] pcInfo, uint count, NTStatus completionStatus)
