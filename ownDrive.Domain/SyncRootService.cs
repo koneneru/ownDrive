@@ -11,7 +11,9 @@ namespace ownDrive.Domain
 {
 	public class SyncRootService
 	{
-		private readonly SyncRoot _syncroot;
+		const int _bufferSize = 1024 * 512; // Buffer size for P/Invoke Call to CFExecute max 1 MB
+
+        private readonly SyncRoot _syncroot;
 		private readonly IPlaceholderRepository _placeholderRepository;
 		public SyncRootService(SyncRoot syncRoot, IPlaceholderRepository placeholderRepository)
 		{
@@ -40,13 +42,54 @@ namespace ownDrive.Domain
 			if (!_placeholderRepository.Connected)
 			{
 				var b = Array.Empty<byte>();
-				TransferData(opInfo, in b, cbParams.FetchData.RequiredFileOffset, cbParams.FetchData.RequiredLength, NtStatus.STATUS_CLOUD_FILE_NETWORK_UNAVAILABLE);
+				TransferData(opInfo, in b, cbParams.FetchData.RequiredFileOffset, cbParams.FetchData.RequiredLength, new NTStatus((uint)NtStatus.STATUS_CLOUD_FILE_NETWORK_UNAVAILABLE));
 
 				return;
 			}
 
-			Task.Run(() => { });
-			throw new NotImplementedException("OnFetchData not implemented yet");
+			var fdParams = new
+			{
+				Path = _syncroot.GetRelativaPath(cbInfo.NormalizedPath),
+				Offset = cbParams.FetchData.RequiredFileOffset,
+				Length = cbParams.FetchData.RequiredLength,
+			};
+
+			// ADD CANCELATION TOKEN USAGE
+
+			Task.Run(() => {
+				var stream = _placeholderRepository.DownloadFileAsync(fdParams.Path).Result;
+				try
+				{
+					byte[] buffer = new byte[_bufferSize];
+					long offset = fdParams.Offset;
+					long remainder = fdParams.Length;
+
+					long completed = 0;
+					long total = fdParams.Length;
+
+					while (remainder>0)
+					{
+						int bytesToRead = (remainder > _bufferSize) ? _bufferSize : (int)remainder;
+                        int readBytes = stream.Read(buffer, 0, bytesToRead);
+                        NTStatus transferStatus = (remainder > _bufferSize) ? NTStatus.STATUS_SUCCESS : NTStatus.STATUS_END_OF_FILE;
+
+						TransferData(opInfo, buffer, offset, readBytes, transferStatus);
+
+						offset += readBytes;
+						completed += readBytes;
+						remainder -=readBytes;
+
+						CfReportProviderProgress(opInfo.ConnectionKey, opInfo.TransferKey, total, completed);
+					}
+				}
+				catch(Exception ex)
+				{
+                    throw new NotImplementedException("Exception was thrown but catch block does not inplemented", ex);
+                }
+				finally {
+					stream.Dispose();	
+				}
+			}/*Put cancellation token here*/);
 		}
 
 		private static CF_OPERATION_INFO CreateOperationInfo(CF_CALLBACK_INFO cbInfo, CF_OPERATION_TYPE opType)
@@ -64,7 +107,7 @@ namespace ownDrive.Domain
 			return opInfo;
 		}
 
-		private static void TransferData(CF_OPERATION_INFO opInfo, in byte[] buffer, long offset, long length, NtStatus completionStatus)
+		private static void TransferData(CF_OPERATION_INFO opInfo, in byte[] buffer, long offset, long length, NTStatus completionStatus)
 		{
 			var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
 			var ptr = (IntPtr)handle;
@@ -76,7 +119,7 @@ namespace ownDrive.Domain
 					Offset = offset,
 					Length = length,
 					Flags = CF_OPERATION_TRANSFER_DATA_FLAGS.CF_OPERATION_TRANSFER_DATA_FLAG_NONE, //Required?
-					CompletionStatus = new NTStatus((uint)completionStatus)
+					CompletionStatus = completionStatus
 				};
 				var opParams = CF_OPERATION_PARAMETERS.Create(tdParams);
 				CfExecute(opInfo, ref opParams);
